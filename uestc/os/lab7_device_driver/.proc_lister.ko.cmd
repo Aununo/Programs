@@ -1,0 +1,1 @@
+cmd_/home/aununo/github/hi/uestc/os/lab7_device_driver/proc_lister.ko := ld -r -m elf_x86_64 -z noexecstack --no-warn-rwx-segments --build-id=sha1  -T scripts/module.lds -o /home/aununo/github/hi/uestc/os/lab7_device_driver/proc_lister.ko /home/aununo/github/hi/uestc/os/lab7_device_driver/proc_lister.o /home/aununo/github/hi/uestc/os/lab7_device_driver/proc_lister.mod.o;  true

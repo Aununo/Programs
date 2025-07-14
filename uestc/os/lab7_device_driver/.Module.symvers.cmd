@@ -1,0 +1,1 @@
+cmd_/home/aununo/github/hi/uestc/os/lab7_device_driver/Module.symvers := sed 's/\.ko$$/\.o/' /home/aununo/github/hi/uestc/os/lab7_device_driver/modules.order | scripts/mod/modpost -m -a -E -o /home/aununo/github/hi/uestc/os/lab7_device_driver/Module.symvers -e    -w -T -
