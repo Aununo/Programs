@@ -18,9 +18,9 @@ HEADERS = {
 }
 SMTP_SERVER = "smtp.qq.com"
 SMTP_PORT = 465
-SENDER_EMAIL = "aununo@qq.com"
-SENDER_PASSWORD = "ixdgrgldjlsldcee"
-RECEIVER_EMAIL = "aununo@qq.com"
+SENDER_EMAIL = ""
+SENDER_PASSWORD = ""
+RECEIVER_EMAIL = ""
 
 # --- 2. 状态和邮件发送函数 ---
 problems_fb_state = {}
