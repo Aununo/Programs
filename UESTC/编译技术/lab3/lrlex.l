@@ -1,13 +1,18 @@
+%option noinput nounput
+
 %{
-#include "token.h"
-extern _YYLVAL yylval;
+#include <stdlib.h>
+#include "ast.h"
+#include "lrparser.tab.h"
+int type;
 %}
+
 
 DELIM          [\t \n]+
 WS             {DELIM}
 DIGIT          [0-9]
 LETTER 	       [A-Za-z]
-
+     
 %%
 
 (\/\/[^\n]*\n)|(\/\*([^*]|\*+[^\/])*\*+\/)	    { /* noaction */ } 

@@ -12,9 +12,18 @@ LETTER 	       [A-Za-z]
 
 (\/\/[^\n]*\n)|(\/\*([^*]|\*+[^\/])*\*+\/)	    { /* noaction */ } 
 {WS}+   									    { /* noaction */ } 
--?{DIGIT}+	     							    { yylval.int_value = atoi(yytext); return num_INT; } 
--?0x[0-9a-fA-F]+                                { yylval.int_value = strtol(yytext, NULL, 16); return num_INT; }
--?{DIGIT}+"."{DIGIT}+						    { yylval.float_value = (float)atof(yytext); return num_FLOAT; } 
+
+0x[0-9a-fA-F]+\.[0-9a-fA-F]*[pP][+-]?{DIGIT}+   { yylval.float_value = (float)strtod(yytext, NULL); return num_FLOAT; }
+0x\.[0-9a-fA-F]+[pP][+-]?{DIGIT}+               { yylval.float_value = (float)strtod(yytext, NULL); return num_FLOAT; }
+0x[0-9a-fA-F]+[pP][+-]?{DIGIT}+                 { yylval.float_value = (float)strtod(yytext, NULL); return num_FLOAT; }
+
+{DIGIT}+\.{DIGIT}*([eE][+-]?{DIGIT}+)?          { yylval.float_value = (float)atof(yytext); return num_FLOAT; }
+\.{DIGIT}+([eE][+-]?{DIGIT}+)?                  { yylval.float_value = (float)atof(yytext); return num_FLOAT; }
+{DIGIT}+[eE][+-]?{DIGIT}+                       { yylval.float_value = (float)atof(yytext); return num_FLOAT; }
+
+0x[0-9a-fA-F]+                                  { yylval.int_value = strtol(yytext, NULL, 16); return num_INT; }
+{DIGIT}+	     							    { yylval.int_value = atoi(yytext); return num_INT; } 
+
 
 int											    { return Y_INT; }
 float										    { return Y_FLOAT; }
