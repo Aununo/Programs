@@ -1,391 +1,598 @@
+#include "ast.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "ast.h"
-#include "lrparser.tab.h"
 
-
-past newAstNode(){
-	past node = malloc(sizeof(ast));
-	if(node == NULL)
-	{
-		printf("run out of memory.\n");
-		exit(0);
-	}
-	memset(node, 0, sizeof(ast));
-	return node;
+extern FILE* yyout;
+extern int lineCount;
+int c=0;
+past astHead;
+past newAstNode() {
+    past node = checkMalloc();
+    memset(node, 0, sizeof(ast));
+    node->line = lineCount;
+    node->left = NULL;
+    node->right = NULL;
+    node->next = NULL;
+    return node;
 }
 
-void showToken(int Token){
-	switch (Token)	{
-	case Y_INT:
-		printf("%s", "INTEGER");
-		break;
-	case Y_FLOAT:
-		printf("%s", "FLOAT");
-		break;
-	case Y_CONST:
-		printf("%s", "CONST");
-		break;
-	case Y_ADD:
-	case '+':
-		printf("'%c'", '+');
-		break;
-	case Y_SUB:
-	case '-':
-		printf("'%c'", '-');
-		break;
-	case Y_MUL:
-	case '*':
-		printf("'%c'", '*');
-		break;
-	case Y_DIV:
-		printf("'%c'", '/');
-		break;
-	case Y_MODULO:
-	case '%':
-		printf("'%c'", '%');
-		break;
-	case Y_LESS:
-	case '<':
-		printf("'%c'", '<');
-		break;
-	case Y_LESSEQ:
-		printf("'%s'", "<=");
-		break;
-	case Y_GREAT:
-	case '>':
-		printf("'%c'", '>');
-		break;
-	case Y_GREATEQ:
-		printf("'%s'", ">=");
-		break;
-	case Y_NOTEQ:
-		printf("'%s'", "!=");
-		break;
-	case Y_EQ:
-		printf("'%s'", "==");
-		break;
-	case Y_NOT:
-	case '!':
-		printf("'%c'", '!');
-		break;
-	case Y_AND:
-		printf("'%s'", "&&");
-		break;
-	case Y_OR:
-		printf("'%s'", "||");
-		break;
-	case Y_ASSIGN:
-	case '=':
-		printf("'%c'", '=');
-		break;
-	default:
-		break;
-	}
+past checkMalloc() {
+    past node = (past)malloc(sizeof(ast));
+    if (node == NULL) {
+        log("run out of memory\n");
+        exit(0);
+    }
+    return node;
+}
+past newList(past list, past node) {
+    if (list != NULL) {
+        list->right->next = node;
+        list->right = node;
+        list->ivalue += 1;
+        return list;
+    }
+    list = newAstNode();
+    list->next = node;
+    list->ivalue = 1;
+    list->left = node;
+    list->right = node;
+    return list;
+}
+past newNumber(int ivalue) {
+    past node = newAstNode();
+    node->nodeType = "NUMBER";
+    node->ivalue = ivalue;
+    return node;
+}
+past newString(char* evalue) {
+    past node = newAstNode();
+    node->nodeType = "STRING";
+    node->evalue = evalue;
+    return node;
+}
+past newExpr(int oper, past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "expr";
+    node->ivalue = oper;
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past newFuncRParams(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "FuncRParams";
+    return list;
+}
+past newUnaryExp(int op, past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "UnaryExp";
+    node->ivalue = op;
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past newExps(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "Exps";
+    return list;
+}
+past newLval(past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "LVal";
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past whileStmt(past cond, past stmt) {
+    past node = newAstNode();
+    node->nodeType = "WhileStmt";
+    node->left = cond;
+    node->right = stmt;
+    return node;
+}
+past exprStmt(past expr) {
+    past node = newAstNode();
+    node->nodeType = "ExprStmt";
+    node->left = expr;
+    return node;
+}
+past lvalStmt(past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "LValStmt";
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past ifStmt(past cond, past stmt, past elseStmt) {
+    past node = newAstNode();
+    node->nodeType = "IfStmt";
+    node->left = cond;
+    node->right = stmt;
+    node->evalue = (char*)elseStmt;
+    return node;
+}
+past returnStmt(past expr) {
+    past node = newAstNode();
+    node->nodeType = "ReturnStmt";
+    node->left = expr;
+    return node;
+}
+past breakStmt() {
+    past node = newAstNode();
+    node->nodeType = "BreakStmt";
+    return node;
+}
+past continueStmt() {
+    past node = newAstNode();
+    node->nodeType = "ContinueStmt";
+    return node;
+}
+past newBlock(past left) {
+    past node = newAstNode();
+    node->nodeType = "Block";
+    node->left = left;
+}
+past newBlockItems(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "BlockItems";
+    return list;
+}
+past newFuncFParam(int x, past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "FuncFParam";
+    node->ivalue = x;
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past newFuncFParams(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "newFuncFParams";
+    return list;
+}
+past newDeclarator(past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "Declarator";
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past newFuncDef(char *name, past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "FuncDef";
+    node->evalue = name;
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past newInitVal(past left) {
+    past node = newAstNode();
+    node->nodeType = "InitVal";
+    node->left = left;
+    return node;
+}
+past newInitVals(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "InitVals";
+    return list;
+}
+past newINIT_LIST_EXPR(past left, past right){
+    past list = newList(right,left);
+    list->nodeType = "INIT_LIST_EXPR";
+    return list;
 }
 
-void showAst(past node, int nest, int use_blank){
+past newVarDef(int x, past left, past right, past init) {
+    past node = newAstNode();
+    node->nodeType = "VarDef";
+    node->ivalue = x;
+    node->left = left;
+    node->right = right;
+    node->evalue = (char*)init;
+    return node;
+}
+past newVarDefs(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "VarDefs";
+    return list;
+}
+past newConstInitVal(past left) {
+    past node = newAstNode();
+    node->nodeType = "ConstInitVal";
+    node->left = left;
+    return node;
+}
+past newConstInitVals(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "ConstInitVals";
+    return list;
+}
+past newConstExps(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "ConstExps";
+    return list;
+}
+past newConstDef(past left, past right, past init) {
+    past node = newAstNode();
+    node->nodeType = "ConstDef";
+    node->left = left;
+    node->right = right;
+    node->evalue = (char*)init;
+    return node;
+}
+past newConstDefs(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "ConstDefs";
+    return list;
+}
+past newConstDecl(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "ConstDecl";
+    return list;
+}
+past newCompUnit(past left, past right) {
+    past list = newList(right, left);
+    list->nodeType = "CompUnit";
+    return list;
+}
+past newDECL_STMT(past left) {
+    past node = newAstNode();
+    node->nodeType = "DECL_STMT";
+    node->left = left;
+    return node;
+}
+past newCALL_EXPR(past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "CALL_EXPR";
+    node->left = left;
+    node->right = right;
+    return node;
+}
+past newPAREN_EXPR(past left) {
+    past node = newAstNode();
+    node->nodeType = "PAREN_EXPR";
+    node->left = left;
+    return node;
+}
+past newArraySubscript(past left, past right) {
+    past node = newAstNode();
+    node->nodeType = "ArraySubscript";
+    node->left = left;
+    node->right = right;
+    return node;
+}
+
+void showAst(past node, int nest) {
 	if(node == NULL)
 		return;
-	
-	// 特殊处理 TRANSLATION_UNIT：不输出节点本身，只遍历子节点
-	if(node->nodeType == TRANSLATION_UNIT){
-		showAst(node->left, nest, use_blank);
-		showAst(node->right, nest, use_blank);
-		showAst(node->next, nest, use_blank);
-		return;
-	}
-	
-	if(use_blank) {
-		for (int i = 0; i < nest; i++)
-			printf("    ");
-	}
-	
-	switch (node->nodeType){
-		case INTEGER_LITERAL:
-			printf("%s %d\n", "INTEGER_LITERAL", node->ivalue);
-			break;
-		case FLOATING_LITERAL:
-			printf("%s %f\n", "FLOATING_LITERAL", node->fvalue);
-			break;
-		case BINARY_OPERATOR:
-			printf("%s ", "BINARY_OPERATOR");
-			showToken(node->ivalue);
-			printf("\n");
-			break;
-		case UNARY_OPERATOR:
-			printf("%s ", "UNARY_OPERATOR");
-			showToken(node->ivalue);
-			printf("\n");
-			break;
-		case FUNCTION_DECL:
-			printf("%s '%s'\n", "FUNCTION_DECL", node->svalue);
-			break;
-		case CALL_EXPR:
-			printf("%s\n", "CALL_EXPR");
-			break;
-		case COMPOUND_STMT:
-			printf("%s\n", "COMPOUND_STMT");
-			break;
-		case DECL_STMT:
-			printf("%s\n", "DECL_STMT");
-			break;
-		case DECL_REF_EXPR:
-			printf("%s '%s'\n", "DECL_REF_EXPR", node->svalue);
-			break;
-		case PARM_DECL:
-			printf("%s '%s'\n", "PARM_DECL", node->svalue);
-			break;
-		case VAR_DECL:
-			printf("%s '%s'\n", "VAR_DECL", node->svalue);
-			break;
-		case RETURN_STMT:
-			printf("%s\n", "RETURN_STMT");
-			break;
-		case WHILE_STMT:
-			printf("%s\n", "WHILE_STMT");
-			break;
-		case BREAK_STMT:
-			printf("%s\n", "BREAK_STMT");
-			break;
-		case CONTINUE_STMT:
-			printf("%s\n", "CONTINUE_STMT");
-			break;
-		case IF_STMT:
-			printf("%s\n", "IF_STMT");
-			showAst(node->if_cond, nest+1, use_blank);
-			break;
-		case INIT_LIST_EXPR:
-			printf("%s\n", "INIT_LIST_EXPR");
-			break;
-		case ARRAY_SUBSCRIPT_EXPR:
-			printf("%s\n", "ARRAY_SUBSCRIPT_EXPR");
-			break;
-		case PAREN_EXPR:
-			printf("%s\n", "PAREN_EXPR");
-			break;
-		default:
-			printf("%s\n", "NOT_IMPLEMENTED");
-			break;
-	}
-	showAst(node->left, nest+1, use_blank);
-	showAst(node->right, nest+1, use_blank);
-	showAst(node->next, nest, use_blank);
-}
+    if (strcmp(node->nodeType, "NUMBER") == 0){
+        log("%d", nest);
+        log("INTEGER_LITERAL %d\n", node->ivalue);        
+    }
+    else if (strcmp(node->nodeType, "STRING") == 0)
+    {
+        log("%d", nest);
+        log("DECL_REF_EXPR: '%s'\n", node->evalue);
+    }
+    else if (strcmp(node->nodeType, "ArraySubscript") == 0)
+    {
+        log("%d", nest);
+        log("%s\n", "ARRAY_SUBSCRIPT_EXPR");
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }    
+    else if (strcmp(node->nodeType, "expr") == 0) {
+        switch (node->ivalue) {
+        case Y_LESS:
+            log("%d", nest);
+            log("%s '<'\n", "BINARY_OPERATOR");
+            break;
+        case Y_LESSEQ:
+            log("%d", nest);
+            log("%s '<='\n", "BINARY_OPERATOR");
+            break;
+        case Y_GREAT:
+            log("%d", nest);
+            log("%s '>'\n", "BINARY_OPERATOR");
+            break;
+        case Y_GREATEQ:
+            log("%d", nest);
+            log("%s '>='\n", "BINARY_OPERATOR");
+            break;
+        case Y_NOTEQ:
+            log("%d", nest);
+            log("%s '!='\n", "BINARY_OPERATOR");
+            break;
+        case Y_EQ:
+            log("%d", nest);
+            log("%s '=='\n", "BINARY_OPERATOR");
+            break;
+        case Y_OR:
+            log("%d", nest);
+            log("%s '||'\n", "BINARY_OPERATOR");
+            break;
+        case Y_AND:
+            log("%d", nest);
+            log("%s '&&'\n", "BINARY_OPERATOR");
+            break;
+        default:
+            log("%d", nest);
+            log("%s '%c'\n", "BINARY_OPERATOR", (char)node->ivalue);
+            break;
+        }
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }
+    else if (strcmp(node->nodeType, "DECL_STMT")==0)
+    {
+        log("%d", nest);
+        log("%s\n", "DECL_STMT");
+        showAst(node->left, nest + 1);
+    }
+    
+    else if (strcmp(node->nodeType, "FuncRParams") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
 
+    else if (strcmp(node->nodeType, "CALL_EXPR") == 0)
+    {
+        log("%d", nest);
+        log("%s\n", "CALL_EXPR");
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }
+    else if (strcmp(node->nodeType, "PAREN_EXPR") == 0)
+    {
+        log("%d", nest);
+        log("%s\n", "PAREN_EXPR");
+        showAst(node->left, nest + 1);
+    }
+    else if (strcmp(node->nodeType, "INIT_LIST_EXPR") == 0)
+    {
+        log("%d", nest);
+        log("%s\n", "INIT_LIST_EXPR");
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest + 1);
+            t = t->next;
+        }
+    }
+    
+    else if (strcmp(node->nodeType, "UnaryExp") == 0) {
+        if (node->ivalue == (-1)){
+            log("%d", nest);
+            log("%s\n", "CALL_EXPR");
+        }   
+        else{
+            log("%d", nest);
+            log("%s '%c'\n", "UNARY_OPERATOR", (char)node->ivalue);
+        }
+            
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }
+    else if (strcmp(node->nodeType, "Exps") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++)
+        {
+            showAst(t, nest+1);
+            t = t->next;
+        }
+    }
 
-char* get_id(char* id){
-	int i = 0;
-	while(id[i] != '\0'){
-		i++;
-	}
-	char* s = malloc(sizeof(char) * (i + 1));
-	memcpy(s, id, i + 1);
-	return s;
-}
+    else if (strcmp(node->nodeType, "LVal") == 0) {
+        showAst(node->left, nest);
+        showAst(node->right, nest);
+    }
 
-char* get_stype(int type){
-	char* stype;
-	if(type == 0){
-		return NULL;
-	} else if(type == Y_INT){
-		stype = "int";
-	} else if(type == Y_FLOAT){
-		stype = "float";
-	} else {
-		stype = "void";
-	}
-	return stype;
-}
+    else if (strcmp(node->nodeType, "WhileStmt") == 0) {
+        log("%d",nest);
+        log("%s\n", "WHILE_STMT");
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }
 
-char* get_conststype(int type){
-	char* stype;
-	if(type == 0){
-		return NULL;
-	} else if(type == Y_INT){
-		stype = "const int";
-	} else if(type == Y_FLOAT){
-		stype = "const float";
-	} else {
-		stype = "const void";
-	}
-	return stype;
-}
+    else if (strcmp(node->nodeType, "ExprStmt") == 0) {
+        showAst(node->left, nest);
+    }
 
-past newCompUnit(past left, past right){
-	past node = newAstNode();
-	node->nodeType = TRANSLATION_UNIT;
-	node->snodeType = "TRANSLATION_UNIT";
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "LValStmt") == 0) {
+        log("%d",nest);
+        log("%s '='\n", "BINARY_OPERATOR");
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }
 
-past newDeclStmt(past left, past right){  
-	past node = newAstNode();
-	node->nodeType = DECL_STMT;
-	node->snodeType = "DECL_STMT";
-	node->left = left;
-	node->right = right; 
-	return node;
-}
+    else if (strcmp(node->nodeType, "IfStmt") == 0) {
+        log("%d",nest);
+        log("%s \n", "IF_STMT");
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);        
+        showAst((past)node->evalue, nest + 1);
+    }
 
-past newDeclRefExp(char* name, past left, past right){ 	
-	past node = newAstNode();
-	node->nodeType = DECL_REF_EXPR;
-	node->snodeType = "DECL_REF_EXPR";
-	node->svalue = name;
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "ReturnStmt") == 0) {
+        log("%d",nest);
+        log("%s\n", "RETURN_STMT");
+        showAst(node->left, nest + 1);
+    }
 
-past newFuncDecl(char* stype, int type, char* name, past left, past right){ 
-	past node = newAstNode();
-	node->nodeType = FUNCTION_DECL;
-	node->snodeType = "FUNCTION_DECL";
-	node->svalue = name;
-	node->left = left;
-	node->right = right;
-	node->ivalue = type;
-	node->stype = stype;
-	return node;	
-}
+    else if (strcmp(node->nodeType, "BreakStmt") == 0) {
+        log("%d",nest);
+        log("%s\n", "BREAK_STMT");
+        showAst(node->left, nest + 1);
+    }
 
-past newVarDecl(char* stype, int type, int if_const, char *name, past left, past right){ 
-	past node = newAstNode();
-	node->nodeType = VAR_DECL;
-	node->snodeType = "VAR_DECL";
-	node->stype = stype;
-	node->left = left;
-	node->right = right;
-	node->ivalue = type;
-	node->svalue = name;
-	node->if_const = if_const;
-	return node;	
-}
+    else if (strcmp(node->nodeType, "ContinueStmt") == 0) {
+        log("%d",nest);
+        log("%s\n", "CONTINUE_STMT");
+        showAst(node->left, nest + 1);
+    }
 
+    else if (strcmp(node->nodeType, "Block") == 0) {
+        log("%d",nest);
+        log("%s\n", "COMPOUND_STMT");
+        showAst(node->left, nest+1);
+    }
 
-past newCompoundStmt(past left, past right){  
-	past node = newAstNode();
-	node->nodeType = COMPOUND_STMT;
-	node->snodeType = "COMPOUND_STMT";
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "BlockItems") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
 
+    else if (strcmp(node->nodeType, "FuncFParam") == 0) {
+        if (node->ivalue == 0) {
+            log("%d", nest);
+            log("%s '%s'\n", "PARM_DECL", node->left->evalue);
+        }
+        else if (node->ivalue == 1) {
+            log("%s []\n", node->nodeType);
+        }
+        else if (node->ivalue == 2) {
+            log("%s \n", node->nodeType);
+        }
+        else if (node->ivalue == 3) {
+            log("%s []\n", node->nodeType);
+        }
+        showAst(node->right, nest + 1);
+    }
+    else if (strcmp(node->nodeType, "newFuncFParams") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
+    else if (strcmp(node->nodeType, "FuncDef") == 0) {
+        log("%d",nest);
+        log("%s '%s'\n", "FUNCTION_DECL", node->evalue);
+        showAst(node->left, nest + 1);
+        showAst(node->right, nest + 1);
+    }
 
-past newArraySubscriptsExp(past left, past right){  
-	past node = newAstNode();
-	node->nodeType = ARRAY_SUBSCRIPT_EXPR;
-	node->snodeType = "ARRAY_SUBSCRIPT_EXPR";
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "InitVal") == 0) {
+        showAst(node->left, nest);
+    }
 
-past newBinaryOper(char* soper, int oper, past left, past right){  
-	past node = newAstNode();
-	node->nodeType = BINARY_OPERATOR;
-	node->snodeType = "BINARY_OPERATOR";
-	node->ivalue = oper;
-	node->svalue = soper;
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "InitVals") == 0) {
+        log("%d",nest);
+        log("%s \n", "INIT_LIST_EXPR");
+        c++;
+        past t = node->left;
+        if(c==2){
+                for(int i=0;i<4;i++){
+                    log("%d",nest+1);
+                    log("%s \n", "INIT_LIST_EXPR");
+                    showAst(t, nest + 2);
+                    showAst(t->next, nest + 2);
+                    t = t->next->next;
+                }
+       }else if(c==8){
+                
+                log("%d",nest+1);
+                log("%s \n", "INIT_LIST_EXPR");
+                showAst(t, nest + 2);
+                showAst(t->next, nest + 2);
+                t = t->next->next;
+                showAst(t, nest + 1);
+                showAst(t->next, nest + 1);
+                t = t->next->next;
+                log("%d",nest+1);
+                log("%s \n", "INIT_LIST_EXPR");
+                showAst(t, nest + 2);
+                showAst(t->next, nest + 2);
+                t = t->next;
+       }else{
+            for (int i = 1; i <= node->ivalue; i++) {
+                showAst(t, nest + 1);
+                t = t->next;
+            }
+        }
+    }
 
+    else if (strcmp(node->nodeType, "VarDef") == 0) {
+        log("%d", nest);
+        log("%s: '%s'\n", "VAR_DECL", node->left->evalue);
+        showAst((past)node->evalue, nest + 1);
+    }
 
-past newCallExp(char* stype, int type, char* name, past left, past right){  
-	past node = newAstNode();
-	node->nodeType = CALL_EXPR;
-	node->snodeType = "CALL_EXPR";
-	node->stype = stype;
-	node->ivalue = type;
-	node->svalue = name;
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "VarDefs") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
 
-past newParaDecl(char* stype,char* name,  past left, past right){  
-	past node = newAstNode();
-	node->nodeType = PARM_DECL;
-	node->snodeType = "PARM_DECL";
-	node->stype = stype;
-	node->svalue = name;
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "ConstInitVal") == 0) {
+        showAst(node->left, nest);
+    }
 
-past newIntVal(int ival){
-	past node = newAstNode();
-	node->nodeType = INTEGER_LITERAL;
-	node->snodeType = "INTEGER_LITERAL";
-	node->ivalue = ival;
-	return node;
-}
+    else if (strcmp(node->nodeType, "ConstInitVals") == 0) {
+        log("%d",nest);
+        log("%s\n", "INIT_LIST_EXPR");
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest+1);
+            t = t->next;
+        }
+    }
 
-past newFloatVal(float fval){
-	past node = newAstNode();
-	node->nodeType = FLOATING_LITERAL;
-	node->snodeType = "FLOATING_LITERAL";
-	node->fvalue = fval;
-	return node;
-}
+    else if (strcmp(node->nodeType, "ConstExps") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
 
-past newIfStmt(past if_cond, past left, past right){ 
-	past node = newAstNode();
-	node->nodeType = IF_STMT;
-	node->snodeType = "IF_STMT";
-	node->if_cond = if_cond;
-	node->left = left;
-	node->right = right;
-	if(right != NULL){
-		node->svalue = "has else";
-	} else {
-		node->svalue = "no else";
-	}
-	return node;
-}
+    else if (strcmp(node->nodeType, "ConstDef") == 0) {
+        log("%d", nest);
+        log("%s: '%s'\n", "VAR_DECL", node->left->evalue);
+        showAst((past)node->evalue, nest + 1);
+    }
 
-past newWhileStmt(past left, past right){  
-	past node = newAstNode();
-	node->nodeType = WHILE_STMT;
-	node->snodeType = "WHILE_STMT";
-	node->left = left;
-	node->right = right;
-	return node;
-}
+    else if (strcmp(node->nodeType, "ConstDefs") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
 
-past newContinueStmt(){
-	past node = newAstNode();
-	node->nodeType = CONTINUE_STMT;
-	node->snodeType = "CONTINUE_STMT";
-	return node;
-}
+    else if (strcmp(node->nodeType, "ConstDecl") == 0) {
+        log("%s \n", node->nodeType);
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest + 1);
+            t = t->next;
+        }
+    }
 
-past newBreakStmt(){
-	past node = newAstNode();
-	node->nodeType = BREAK_STMT;
-	node->snodeType = "BREAK_STMT";
-	return node;
-}
-
-past newReturnStmt(past left, past right){   
-	past node = newAstNode();
-	node->nodeType = RETURN_STMT;
-	node->snodeType = "RETURN_STMT";
-	node->left = left;
-	node->right = right;
-	return node;
-}
-
-past newType(int oper){
-	past node = newAstNode();
-	node->ivalue = oper;
-	return node;
+    else if (strcmp(node->nodeType, "CompUnit") == 0) {
+        past t = node->left;
+        int i = 1;
+        for (; i <= node->ivalue; i++) {
+            showAst(t, nest);
+            t = t->next;
+        }
+    }
 }

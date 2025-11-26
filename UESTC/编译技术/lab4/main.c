@@ -15,9 +15,6 @@ void generateAlloca(past node, char* result) {
     if (node == NULL) {
         return;
     }
-    
-    char temp[1024];
-    
     if (node->nodeType == DECL_STMT) {
         if (node->left != NULL) {
             generateAlloca(node->left, result);
@@ -28,8 +25,7 @@ void generateAlloca(past node, char* result) {
     } else if (node->nodeType == VAR_DECL) {
         extern int reg_count;
         int var_reg = reg_count++;
-        sprintf(temp, "  %%%d = alloca i32, align 4\n", var_reg);
-        strcat(result, temp);
+        sprintf(result + strlen(result), "  %%%d = alloca i32, align 4\n", var_reg);
         
         if (node->if_const && node->right != NULL && node->right->nodeType == INTEGER_LITERAL) {
             // const 变量，记录常量值
@@ -50,9 +46,6 @@ void generateGlobalDecl(past node, char* result) {
     if (node == NULL) {
         return;
     }
-    
-    char temp[1024];
-    
     if (node->nodeType == VAR_DECL) {
         int is_const = node->if_const;
         char* keyword = is_const ? "constant" : "global";
@@ -92,19 +85,16 @@ void generateGlobalDecl(past node, char* result) {
                 // 有初始化值 - 需要处理初始化列表
                 if (is_const) {
                     // const 数组需要显式初始化
-                    sprintf(temp, "@%s = %s %s ", node->svalue, keyword, array_type);
-                    strcat(result, temp);
+                    sprintf(result + strlen(result), "@%s = %s %s ", node->svalue, keyword, array_type);
                     
                     if (node->right->nodeType == INTEGER_LITERAL) {
-                        sprintf(temp, "[");
-                        strcat(result, temp);
+                        sprintf(result + strlen(result), "[");
                         past init = node->right;
                         int first = 1;
                         while (init != NULL) {
                             if (init->nodeType == INTEGER_LITERAL) {
                                 if (!first) strcat(result, ", ");
-                                sprintf(temp, "i32 %d", init->ivalue);
-                                strcat(result, temp);
+                                sprintf(result + strlen(result), "i32 %d", init->ivalue);
                                 first = 0;
                                 init = init->next;
                             } else {
@@ -112,23 +102,19 @@ void generateGlobalDecl(past node, char* result) {
                                 break;
                             }
                         }
-                        sprintf(temp, "], align 16\n");
-                        strcat(result, temp);
+                        sprintf(result + strlen(result), "], align 16\n");
                     } else {
                         // 复杂初始化，暂时用0填充
-                        sprintf(temp, "zeroinitializer, align 16\n");
-                        strcat(result, temp);
+                        sprintf(result + strlen(result), "zeroinitializer, align 16\n");
                     }
                 } else {
-                    sprintf(temp, "@%s = %s %s zeroinitializer, align 16\n", 
+                    sprintf(result + strlen(result), "@%s = %s %s zeroinitializer, align 16\n", 
                             node->svalue, keyword, array_type);
-                    strcat(result, temp);
                 }
             } else {
                 // 无初始化值
-                sprintf(temp, "@%s = %s %s zeroinitializer, align 16\n", 
+                sprintf(result + strlen(result), "@%s = %s %s zeroinitializer, align 16\n", 
                         node->svalue, keyword, array_type);
-                strcat(result, temp);
             }
         } else {
             // 普通变量
@@ -144,11 +130,10 @@ void generateGlobalDecl(past node, char* result) {
             }
             
             if (node->right != NULL && node->right->nodeType == INTEGER_LITERAL) {
-                sprintf(temp, "@%s = %s i32 %d, align 4\n", node->svalue, keyword, node->right->ivalue);
+                sprintf(result + strlen(result), "@%s = %s i32 %d, align 4\n", node->svalue, keyword, node->right->ivalue);
             } else {
-                sprintf(temp, "@%s = %s i32 0, align 4\n", node->svalue, keyword);
+                sprintf(result + strlen(result), "@%s = %s i32 0, align 4\n", node->svalue, keyword);
             }
-            strcat(result, temp);
         }
         return;
     }
@@ -189,8 +174,7 @@ void generateCode(past node, char* result) {
     }
     
     if (node->nodeType == FUNCTION_DECL) {
-        char temp[1024];
-        char* llvm_type = "void";
+    char* llvm_type = "void";
         if (node->stype) {
             if (strcmp(node->stype, "int") == 0) {
                 llvm_type = "i32";
@@ -198,17 +182,18 @@ void generateCode(past node, char* result) {
                 llvm_type = "float";
             }
         }
-        sprintf(temp, "\ndefine %s @%s(", llvm_type, node->svalue);
-        strcat(result, temp);
+        sprintf(result + strlen(result), "\ndefine %s @%s(", llvm_type, node->svalue);
     
         past param = node->left;
         int first = 1;
+        int head_param_idx = 0;
         while (param != NULL) {
             if (!first) {
                 strcat(result, ", ");
             }
-            sprintf(temp, "%s %%p%s", param->stype, param->svalue);
-            strcat(result, temp);
+            char* p_type = "i32";
+            if (param->stype && strcmp(param->stype, "float") == 0) p_type = "float";
+            sprintf(result + strlen(result), "%s %%%d", p_type, head_param_idx++);
             first = 0;
             param = param->left;
         }
@@ -216,12 +201,38 @@ void generateCode(past node, char* result) {
         strcat(result, ") {\n");
         
         extern int reg_count;
+        reg_count = head_param_idx + 1; // 参数个数 + 1 (Entry Block 占用一个编号)
+        
+        // 处理参数：为每个参数生成 alloca 和 store，并添加到符号表
+        param = node->left;
+        int param_idx = 0;
+        while (param != NULL) {
+            int param_reg = reg_count++;
+            // 转换类型
+            char* param_llvm_type = "i32";
+            if (param->stype && strcmp(param->stype, "float") == 0) {
+                param_llvm_type = "float";
+            }
+            
+            // alloca
+            sprintf(result + strlen(result), "  %%%d = alloca %s, align 4\n", param_reg, param_llvm_type);
+            
+            // store: 使用匿名参数寄存器 %param_idx
+            sprintf(result + strlen(result), "  store %s %%%d, %s* %%%d, align 4\n", 
+                    param_llvm_type, param_idx, param_llvm_type, param_reg);
+            
+            // 添加到符号表
+            addSymbol(param->svalue, param_reg);
+            
+            param = param->left;
+            param_idx++;
+        }
+        
         int main_ret_var = -1;
 
         if (strcmp(node->svalue, "main") == 0 && strcmp(llvm_type, "i32") == 0) {
             main_ret_var = reg_count++;
-            sprintf(temp, "  %%%d = alloca i32, align 4\n", main_ret_var);
-            strcat(result, temp);
+            sprintf(result + strlen(result), "  %%%d = alloca i32, align 4\n", main_ret_var);
         }
 
         if (node->right != NULL && node->right->nodeType == COMPOUND_STMT) {
@@ -233,8 +244,7 @@ void generateCode(past node, char* result) {
         }
 
         if (main_ret_var != -1) {
-            sprintf(temp, "  store i32 0, i32* %%%d, align 4\n", main_ret_var);
-            strcat(result, temp);
+            sprintf(result + strlen(result), "  store i32 0, i32* %%%d, align 4\n", main_ret_var);
         }
 
         if (node->right != NULL && node->right->nodeType == COMPOUND_STMT) {
@@ -246,8 +256,7 @@ void generateCode(past node, char* result) {
         }
 
         if (strcmp(llvm_type, "void") == 0) {
-            sprintf(temp, "  ret void\n");
-            strcat(result, temp);
+            sprintf(result + strlen(result), "  ret void\n");
         }
         
         strcat(result, "}\n");
@@ -265,7 +274,7 @@ int main(int argc, char* argv[]) {
 
     yyparse();
 
-    char* result = (char*)malloc(1024 * 1024); 
+    char* result = (char*)malloc(64 * 1024); 
     if (result == NULL) {
         fprintf(stderr, "内存分配失败\n");
         return 1;

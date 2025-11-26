@@ -2,7 +2,7 @@
 
 %{
 #include <stdlib.h>
-#include "../lab3/ast.h"
+#include "ast.h"
 #include "lrparser.tab.h"
 int type;
 %}

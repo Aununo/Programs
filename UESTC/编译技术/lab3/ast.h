@@ -1,270 +1,98 @@
-// Declaration Kinds
-#ifndef COMPILER_LAB_NODE_TYPE_H
-#define COMPILER_LAB_NODE_TYPE_H
-
-enum _node_type{
-
-	// A declaration whose specific kind is not exposed via this interface
-	//
-
-	// A C or C++ struct
-	STRUCT_DECL = 2,
-
-	// A C or C++ union
-	UNION_DECL = 3,
-
-	// An enumeration
-	ENUM_DECL = 5,
-
-	// A field in C, or non-static data member in C++, in a struct, union, or C++
-	// class
-	FIELD_DECL = 6,
-
-	// An enumerator constant
-	ENUM_CONSTANT_DECL = 7,
-
-	// A function
-	FUNCTION_DECL = 8,
-
-	// A variable
-	VAR_DECL = 9,
-
-	// A function or method parameter
-	PARM_DECL = 10,
-
-
-	// A typedef
-	TYPEDEF_DECL = 20,
-
-	// A Type alias decl
-	TYPE_ALIAS_DECL = 36,
-
-
-	// A reference to a member of a struct, union, or class that occurs in
-	// some non-expression context, eg, a designated initializer
-	MEMBER_REF = 47,
-
-	// A reference to a labeled statement
-	LABEL_REF = 48,
-
-	// A reference to a set of overloaded functions or function templates
-	// that has not yet been resolved to a specific function or function template
-	OVERLOADED_DECL_REF = 49,
-
-	// A reference to a variable that occurs in some non-expression
-	// context, eg, a C++ lambda capture list
-	VARIABLE_REF = 50,
-
-
-	//////
-	// Invalid/Error Kinds
-
-	INVALID_FILE = 70,
-	NO_DECL_FOUND = 71,
-	NOT_IMPLEMENTED = 72,
-	INVALID_CODE = 73,
-	
-
-	//////
-	// Expression Kinds
-
-	// An expression whose specific kind is not exposed via this interface
-	//
-	// Unexposed expressions have the same operations as any other kind of
-	// expression; one can extract their location information, spelling, children,
-	// etc However, the specific kind of the expression is not reported
-	UNEXPOSED_EXPR = 100,
-
-	// An expression that refers to some value declaration, such as a function,
-	// variable, or enumerator
-	DECL_REF_EXPR = 101,
-
-	// An expression that refers to a member of a struct, union, class, Objective-C
-	// class, etc
-	MEMBER_REF_EXPR = 102,
-
-	// An expression that calls a function
-	CALL_EXPR = 103,
-
-
-	// An expression that represents a block literal
-	BLOCK_EXPR = 105,
-
-	// An integer literal
-	INTEGER_LITERAL = 106,
-
-	// A floating point number literal
-	FLOATING_LITERAL = 107,
-
-	// An imaginary number literal
-	IMAGINARY_LITERAL = 108,
-
-	// A string literal
-	STRING_LITERAL = 109,
-
-	// A character literal
-	CHARACTER_LITERAL = 110,
-
-	// A parenthesized expression, eg "1,"
-	//
-	// This AST node is only formed if full location information is requested
-	PAREN_EXPR = 111,
-
-	// This represents the unary-expression's except sizeof and
-	// alignof,
-	UNARY_OPERATOR = 112,
-
-	// [C99 6521] Array Subscripting
-	ARRAY_SUBSCRIPT_EXPR = 113,
-
-	// A builtin binary operation expression such as "x + y" or
-	// "x <= y"
-	BINARY_OPERATOR = 114,
-
-	// Compound assignment such as "+="
-	COMPOUND_ASSIGNMENT_OPERATOR = 115,
-
-	// The ?: ternary operator
-	CONDITIONAL_OPERATOR = 116,
-
-	// An explicit cast in C C99 654, or a C-style cast in C++
-	// C++ [exprcast],, which uses the syntax Type,expr
-	//
-	// For example: int,f
-	CSTYLE_CAST_EXPR = 117,
-
-	// [C99 6525]
-	COMPOUND_LITERAL_EXPR = 118,
-
-	// Describes an C or C++ initializer list
-	INIT_LIST_EXPR = 119,
-
-	// The GNU address of label extension, representing &&label
-	ADDR_LABEL_EXPR = 120,
-
-
-
-	// A statement whose specific kind is not exposed via this interface
-	//
-	// Unexposed statements have the same operations as any other kind of statement;
-	// one can extract their location information, spelling, children, etc However,
-	// the specific kind of the statement is not reported
-	UNEXPOSED_STMT = 200,
-
-	// A labelled statement in a function
-	LABEL_STMT = 201,
-
-	// A compound statement
-	COMPOUND_STMT = 202,
-
-	// A case statement
-	CASE_STMT = 203,
-
-	// A default statement
-	DEFAULT_STMT = 204,
-
-	// An if statement
-	IF_STMT = 205,
-
-	// A switch statement
-	SWITCH_STMT = 206,
-
-	// A while statement
-	WHILE_STMT = 207,
-
-	// A do statement
-	DO_STMT = 208,
-
-	// A for statement
-	FOR_STMT = 209,
-
-	// A goto statement
-	GOTO_STMT = 210,
-
-	// An indirect goto statement
-	INDIRECT_GOTO_STMT = 211,
-
-	// A continue statement
-	CONTINUE_STMT = 212,
-
-	// A break statement
-	BREAK_STMT = 213,
-
-	// A return statement
-	RETURN_STMT = 214,
-
-
-	// The null statement
-	NULL_STMT = 230,
-
-	// Adaptor class for mixing declarations with statements and expressions
-	DECL_STMT = 231,
-
-
-	//////
-	// Other Kinds
-
-	// Cursor that represents the translation unit itself
-	//
-	// The translation unit cursor exists primarily to act as the root cursor for
-	// traversing the contents of a translation unit
-	TRANSLATION_UNIT = 300,
-};
-
-typedef enum _node_type node_type;
-extern int type;
-#endif
-
-//全局变量~
-extern int yylex();
-extern char* yytext;
-extern int yyleng;
-extern int tok;
-
-//结点声明
+#define log(format, ...) fprintf(yyout, format, ##__VA_ARGS__)
 typedef struct _ast ast;
-typedef struct _ast *past;
-struct _ast{
-	char* stype;
+typedef struct _ast* past;
+typedef struct _symtab symtab;
+typedef struct _symtab* tab;
+struct _ast {
+	char* nodeType;
+	int line;
 	int ivalue;
-	float fvalue;
-	char* svalue;
-	node_type nodeType;
-	char* snodeType;
-	int if_const;
+	char* evalue;
 	past left;
 	past right;
-	past if_cond;
 	past next;
 };
-
-//函数声明
-
-//返回ast结点函数
+enum Token_T {
+	num_INT = 258,
+	num_FLOAT = 259,
+	Y_ID = 260,
+	Y_INT = 261,
+	Y_VOID = 262,
+	Y_CONST = 263,
+	Y_IF = 264,
+	Y_ELSE = 265,
+	Y_WHILE = 266,
+	Y_BREAK = 267,
+	Y_CONTINUE = 268,
+	Y_RETURN = 269,
+	Y_ADD = 270,
+	Y_SUB = 271,
+	Y_MUL = 272,
+	Y_DIV = 273,
+	Y_MODULO = 274,
+	Y_LESS = 275,
+	Y_LESSEQ = 276,
+	Y_GREAT = 277,
+	Y_GREATEQ = 278,
+	Y_NOTEQ = 279,
+	Y_EQ = 280,
+	Y_NOT = 281,
+	Y_AND = 282,
+	Y_OR = 283,
+	Y_ASSIGN = 284,
+	Y_LPAR = 285,
+	Y_RPAR = 286,
+	Y_LBRACKET = 287,
+	Y_RBRACKET = 288,
+	Y_LSQUARE = 289,
+	Y_RSQUARE = 290,
+	Y_COMMA = 291,
+	Y_SEMICOLON = 292,
+	Y_FLOAT = 293
+};
+extern past astHead;
+extern int c;
+past checkMalloc();
 past newAstNode();
-//显示ast
-void showAst(past node, int nest, int use_blank);
-void showToken(int Token);
-
-char* get_id(char* yytext);
-char* get_stype(int type);
-char* get_conststype(int type);
-
-past newDeclStmt(past left, past right);
+past newList(past list, past node);
+past newID(char* evalue);
+past newNumber(int ivalue);
+past newString(char* evalue);
 past newCompUnit(past left, past right);
-past newDeclRefExp(char* name, past left, past right);
-past newFuncDecl(char* stype, int type,char* svalue, past left, past right);
-past newBinaryOper(char* soper, int oper, past left, past right);
-past newArraySubscriptsExp(past left, past right);
-past newCallExp(char* stype, int type, char* name, past left, past right);
-past newParaDecl(char* stype, char* name, past left, past right);
-past newCompoundStmt(past left, past right);
-past newIntVal(int ival);
-past newFloatVal(float fval);
-past newVarDecl(char* stype, int type, int if_cond, char* s, past left, past right);
-past newIfStmt(past if_cond, past left, past right);
-past newWhileStmt(past left, past right);
-past newContinueStmt();
-past newBreakStmt();
-past newReturnStmt(past left, past right);
-past newType(int oper);
+past newConstDecl(past left, past right);
+past newConstDefs(past left, past right);
+past newConstDef(past left, past right, past init);
+past newConstExps(past left, past right);
+past newConstInitVals(past left, past right);
+past newConstInitVal(past left);
+past newVarDecl(past left);
+past newVarDef(int x, past left, past right, past init);
+past newVarDefs(past left, past right);
+past newInitVals(past left, past right);
+past newInitVal(past left);
+past newFuncDef(char *name, past left, past right);
+past newDeclarator(past left, past right);
+past newFuncFParams(past left, past right);
+past newFuncFParam(int x, past left, past right);
+past newBlockItems(past left, past right);
+past newBlock(past left);
+past newStmt(past left, past right);
+past continueStmt();
+past breakStmt();
+past returnStmt(past expr);
+past ifStmt(past cond, past stmt, past elseStmt);
+past lvalStmt(past left, past right);
+past exprStmt(past expr);
+past whileStmt(past cond, past stmt);
+past newLval(past left, past right);
+past newExps(past left, past right);
+past newExpr(int oper, past left, past right);
+past newUnaryExp(int op, past left, past right);
+past newFuncRParams(past left, past right);
+past newDECL_STMT(past left);
+past newCALL_EXPR(past left, past right);
+past newPAREN_EXPR(past left);
+past newINIT_LIST_EXPR(past left, past right);
+past newArraySubscript(past left, past right);
+
+void showAst(past p, int nest);

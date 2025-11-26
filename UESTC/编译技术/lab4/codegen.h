@@ -1,7 +1,7 @@
 #ifndef CODEGEN_H
 #define CODEGEN_H
 
-#include "../lab3/ast.h"
+#include "ast.h"
 #include "lrparser.tab.h"
 #include <stdio.h>
 #include <stdlib.h>

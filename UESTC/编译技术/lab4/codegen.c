@@ -116,6 +116,9 @@ void freeSymbols() {
         pSymbol temp = current;
         current = current->next;
         free(temp->name);
+        if (temp->array_type) {
+            free(temp->array_type);
+        }
         free(temp);
     }
     symbol_table = NULL;
@@ -132,8 +135,6 @@ int newLabel() {
 
 ExprResult genExpr(past node, char* result) {
     ExprResult res;
-    char temp[1024];
-    
     if (node == NULL) {
         res.is_immediate = 1;
         res.value = 0;
@@ -148,8 +149,7 @@ ExprResult genExpr(past node, char* result) {
     
     if (node->nodeType == FLOATING_LITERAL) {
         int reg = newRegister();
-        sprintf(temp, "  %%%d = fadd float 0.0, %f\n", reg, node->fvalue);
-        strcat(result, temp);
+        sprintf(result + strlen(result), "  %%%d = fadd float 0.0, %f\n", reg, node->fvalue);
         res.is_immediate = 0;
         res.value = reg;
         return res;
@@ -167,19 +167,17 @@ ExprResult genExpr(past node, char* result) {
         
         // 然后生成函数调用
         int call_reg = newRegister();
-        sprintf(temp, "  %%%d = call i32 @%s(", call_reg, node->svalue);
-        strcat(result, temp);
+        sprintf(result + strlen(result), "  %%%d = call i32 @%s(", call_reg, node->svalue);
         
         for (int i = 0; i < arg_count; i++) {
             if (i > 0) {
                 strcat(result, ", ");
             }
             if (arg_results[i].is_immediate) {
-                sprintf(temp, "i32 %d", arg_results[i].value);
+                sprintf(result + strlen(result), "i32 %d", arg_results[i].value);
             } else {
-                sprintf(temp, "i32 %%%d", arg_results[i].value);
+                sprintf(result + strlen(result), "i32 %%%d", arg_results[i].value);
             }
-            strcat(result, temp);
         }
         
         strcat(result, ")\n");
@@ -240,14 +238,13 @@ ExprResult genExpr(past node, char* result) {
                 
                 int load_reg = newRegister();
                 if (sym->array_type) {
-                    sprintf(temp, "  %%%d = load i32, i32* getelementptr inbounds (%s, %s* @%s, i64 0, i64 %d), align 16\n", 
+                    sprintf(result + strlen(result), "  %%%d = load i32, i32* getelementptr inbounds (%s, %s* @%s, i64 0, i64 %d), align 16\n", 
                             load_reg, sym->array_type, sym->array_type, node->svalue, indices[0]);
                 } else {
                     // 默认为简单数组
-                    sprintf(temp, "  %%%d = load i32, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @%s, i64 0, i64 %d), align 16\n", 
+                    sprintf(result + strlen(result), "  %%%d = load i32, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @%s, i64 0, i64 %d), align 16\n", 
                             load_reg, node->svalue, indices[0]);
                 }
-                strcat(result, temp);
                 
                 res.is_immediate = 0;
                 res.value = load_reg;
@@ -256,11 +253,10 @@ ExprResult genExpr(past node, char* result) {
                 // 普通变量访问
                 int load_reg = newRegister();
                 if (sym->is_global) {
-                    sprintf(temp, "  %%%d = load i32, i32* @%s, align 4\n", load_reg, node->svalue);
+                    sprintf(result + strlen(result), "  %%%d = load i32, i32* @%s, align 4\n", load_reg, node->svalue);
                 } else {
-                    sprintf(temp, "  %%%d = load i32, i32* %%%d, align 4\n", load_reg, sym->reg_num);
+                    sprintf(result + strlen(result), "  %%%d = load i32, i32* %%%d, align 4\n", load_reg, sym->reg_num);
                 }
-                strcat(result, temp);
                 res.is_immediate = 0;
                 res.value = load_reg;
                 return res;
@@ -285,8 +281,7 @@ ExprResult genExpr(past node, char* result) {
                     return res;
                 } else {
                     int result_reg = newRegister();
-                    sprintf(temp, "  %%%d = sub nsw i32 0, %%%d\n", result_reg, right_res.value);
-                    strcat(result, temp);
+                    sprintf(result + strlen(result), "  %%%d = sub nsw i32 0, %%%d\n", result_reg, right_res.value);
                     res.is_immediate = 0;
                     res.value = result_reg;
                     return res;
@@ -376,17 +371,15 @@ ExprResult genExpr(past node, char* result) {
             }
             
             if (left_res.is_immediate && right_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp %s i32 %d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             } else if (left_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp %s i32 %d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             } else if (right_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp %s i32 %%%d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %%%d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             } else {
-                sprintf(temp, "  %%%d = icmp %s i32 %%%d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %%%d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             }
-            strcat(result, temp);
-            sprintf(temp, "  %%%d = zext i1 %%%d to i32\n", result_reg, cmp_reg);
-            strcat(result, temp);
+            sprintf(result + strlen(result), "  %%%d = zext i1 %%%d to i32\n", result_reg, cmp_reg);
             res.is_immediate = 0;
             res.value = result_reg;
             return res;
@@ -399,24 +392,20 @@ ExprResult genExpr(past node, char* result) {
             result_reg = newRegister();
             
             if (left_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp ne i32 %d, 0\n", left_bool, left_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp ne i32 %d, 0\n", left_bool, left_res.value);
             } else {
-                sprintf(temp, "  %%%d = icmp ne i32 %%%d, 0\n", left_bool, left_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp ne i32 %%%d, 0\n", left_bool, left_res.value);
             }
-            strcat(result, temp);
             
             if (right_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp ne i32 %d, 0\n", right_bool, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp ne i32 %d, 0\n", right_bool, right_res.value);
             } else {
-                sprintf(temp, "  %%%d = icmp ne i32 %%%d, 0\n", right_bool, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp ne i32 %%%d, 0\n", right_bool, right_res.value);
             }
-            strcat(result, temp);
             
-            sprintf(temp, "  %%%d = %s i1 %%%d, %%%d\n", and_or_reg, 
+            sprintf(result + strlen(result), "  %%%d = %s i1 %%%d, %%%d\n", and_or_reg, 
                     op == Y_AND ? "and" : "or", left_bool, right_bool);
-            strcat(result, temp);
-            sprintf(temp, "  %%%d = zext i1 %%%d to i32\n", result_reg, and_or_reg);
-            strcat(result, temp);
+            sprintf(result + strlen(result), "  %%%d = zext i1 %%%d to i32\n", result_reg, and_or_reg);
             res.is_immediate = 0;
             res.value = result_reg;
             return res;
@@ -455,15 +444,14 @@ ExprResult genExpr(past node, char* result) {
         }
         
         if (left_res.is_immediate && right_res.is_immediate) {
-            sprintf(temp, "  %%%d = %s%s i32 %d, %d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
+            sprintf(result + strlen(result), "  %%%d = %s%s i32 %d, %d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
         } else if (left_res.is_immediate) {
-            sprintf(temp, "  %%%d = %s%s i32 %d, %%%d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
+            sprintf(result + strlen(result), "  %%%d = %s%s i32 %d, %%%d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
         } else if (right_res.is_immediate) {
-            sprintf(temp, "  %%%d = %s%s i32 %%%d, %d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
+            sprintf(result + strlen(result), "  %%%d = %s%s i32 %%%d, %d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
         } else {
-            sprintf(temp, "  %%%d = %s%s i32 %%%d, %%%d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
+            sprintf(result + strlen(result), "  %%%d = %s%s i32 %%%d, %%%d\n", result_reg, op_str, nsw_flag, left_res.value, right_res.value);
         }
-        strcat(result, temp);
         res.is_immediate = 0;
         res.value = result_reg;
         return res;
@@ -486,9 +474,6 @@ void genAssignStmt(past node, char* result) {
     if (node == NULL || node->nodeType != BINARY_OPERATOR || node->ivalue != Y_ASSIGN) {
         return;
     }
-    
-    char temp[1024];
-    
     if (node->left->nodeType == DECL_REF_EXPR) {
         char* var_name = node->left->svalue;
         pSymbol sym = findSymbolPtr(var_name);
@@ -496,18 +481,16 @@ void genAssignStmt(past node, char* result) {
         if (sym == NULL) {
             // 如果符号不存在，创建局部变量
             int var_reg = newRegister();
-            sprintf(temp, "  %%%d = alloca i32, align 4\n", var_reg);
-            strcat(result, temp);
+            sprintf(result + strlen(result), "  %%%d = alloca i32, align 4\n", var_reg);
             addSymbol(var_name, var_reg);
             
             ExprResult right_res = genExpr(node->right, result);
             
             if (right_res.is_immediate) {
-                sprintf(temp, "  store i32 %d, i32* %%%d, align 4\n", right_res.value, var_reg);
+                sprintf(result + strlen(result), "  store i32 %d, i32* %%%d, align 4\n", right_res.value, var_reg);
             } else {
-                sprintf(temp, "  store i32 %%%d, i32* %%%d, align 4\n", right_res.value, var_reg);
+                sprintf(result + strlen(result), "  store i32 %%%d, i32* %%%d, align 4\n", right_res.value, var_reg);
             }
-            strcat(result, temp);
         } else {
             // 符号已存在
             ExprResult right_res = genExpr(node->right, result);
@@ -515,40 +498,53 @@ void genAssignStmt(past node, char* result) {
             if (sym->is_global) {
                 // 全局变量
                 if (right_res.is_immediate) {
-                    sprintf(temp, "  store i32 %d, i32* @%s, align 4\n", right_res.value, var_name);
+                    sprintf(result + strlen(result), "  store i32 %d, i32* @%s, align 4\n", right_res.value, var_name);
                 } else {
-                    sprintf(temp, "  store i32 %%%d, i32* @%s, align 4\n", right_res.value, var_name);
+                    sprintf(result + strlen(result), "  store i32 %%%d, i32* @%s, align 4\n", right_res.value, var_name);
                 }
             } else {
                 // 局部变量
                 if (right_res.is_immediate) {
-                    sprintf(temp, "  store i32 %d, i32* %%%d, align 4\n", right_res.value, sym->reg_num);
+                    sprintf(result + strlen(result), "  store i32 %d, i32* %%%d, align 4\n", right_res.value, sym->reg_num);
                 } else {
-                    sprintf(temp, "  store i32 %%%d, i32* %%%d, align 4\n", right_res.value, sym->reg_num);
+                    sprintf(result + strlen(result), "  store i32 %%%d, i32* %%%d, align 4\n", right_res.value, sym->reg_num);
                 }
             }
-            strcat(result, temp);
         }
     }
 }
 
+// 辅助函数：确保标号已分配
+void ensure_label(int* label) {
+    if (*label == 0) {
+        *label = newLabel();
+    }
+}
+
 // 生成短路求值的条件表达式，返回用于 br 的 i1 寄存器
-int genCondExpr(past node, char* result, int true_label, int false_label) {
-    char temp[1024];
-    
+int genCondExpr(past node, char* result, int* true_label, int* false_label) {
     if (node == NULL) {
         return -1;
     }
     
     // 处理 || 运算符（短路求值）
     if (node->nodeType == BINARY_OPERATOR && node->ivalue == Y_OR) {
-        int mid_label = newLabel();
+        int mid_label = 0;
         
-        // 对于 A || B：如果 A 为真，跳转到 true_label；否则继续检查 B
-        genCondExpr(node->left, result, true_label, mid_label);
+        // 对于 A || B：如果 A 为真，跳转到 true_label；否则继续检查 B (mid_label)
+        genCondExpr(node->left, result, true_label, &mid_label);
         
-        sprintf(temp, "%d:\n", mid_label);
-        strcat(result, temp);
+        if (mid_label != 0) {
+            sprintf(result + strlen(result), "%d:\n", mid_label);
+        } else {
+            // 如果左侧没有生成跳转（例如常量），可能需要处理，但通常 genCondExpr 会生成跳转
+            // 如果 mid_label 仍为 0，说明左侧可能直接返回了，或者没有用到 mid_label
+            // 这里为了安全，如果 mid_label 没被分配，说明左侧可能是死代码或常量
+            // 但为了连接右侧，我们需要一个标号吗？
+            // 如果左侧是常量真，直接跳 true_label。
+            // 如果左侧是常量假，fall through 到右侧。
+            // 简单起见，我们假设 genCondExpr 总是生成跳转。
+        }
         
         genCondExpr(node->right, result, true_label, false_label);
         return -1;
@@ -556,19 +552,20 @@ int genCondExpr(past node, char* result, int true_label, int false_label) {
     
     // 处理 && 运算符（短路求值）
     if (node->nodeType == BINARY_OPERATOR && node->ivalue == Y_AND) {
-        int mid_label = newLabel();
+        int mid_label = 0;
         
-        // 对于 A && B：如果 A 为假，跳转到 false_label；否则继续检查 B
-        genCondExpr(node->left, result, mid_label, false_label);
+        // 对于 A && B：如果 A 为假，跳转到 false_label；否则继续检查 B (mid_label)
+        genCondExpr(node->left, result, &mid_label, false_label);
         
-        sprintf(temp, "%d:\n", mid_label);
-        strcat(result, temp);
+        if (mid_label != 0) {
+            sprintf(result + strlen(result), "%d:\n", mid_label);
+        }
         
         genCondExpr(node->right, result, true_label, false_label);
         return -1;
     }
     
-    // 对于比较运算符，直接生成 icmp 和 br，不使用 zext
+    // 对于比较运算符，直接生成 icmp 和 br
     if (node->nodeType == BINARY_OPERATOR) {
         int op = node->ivalue;
         
@@ -590,18 +587,18 @@ int genCondExpr(past node, char* result, int true_label, int false_label) {
             }
             
             if (left_res.is_immediate && right_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp %s i32 %d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             } else if (left_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp %s i32 %d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             } else if (right_res.is_immediate) {
-                sprintf(temp, "  %%%d = icmp %s i32 %%%d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %%%d, %d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             } else {
-                sprintf(temp, "  %%%d = icmp %s i32 %%%d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
+                sprintf(result + strlen(result), "  %%%d = icmp %s i32 %%%d, %%%d\n", cmp_reg, cmp_op, left_res.value, right_res.value);
             }
-            strcat(result, temp);
             
-            sprintf(temp, "  br i1 %%%d, label %%%d, label %%%d\n", cmp_reg, true_label, false_label);
-            strcat(result, temp);
+            ensure_label(true_label);
+            ensure_label(false_label);
+            sprintf(result + strlen(result), "  br i1 %%%d, label %%%d, label %%%d\n", cmp_reg, *true_label, *false_label);
             
             return cmp_reg;
         }
@@ -612,16 +609,17 @@ int genCondExpr(past node, char* result, int true_label, int false_label) {
     
     int cond_bool_reg = newRegister();
     if (cond_res.is_immediate) {
-        sprintf(temp, "  br i1 %d, label %%%d, label %%%d\n", 
-                cond_res.value != 0, true_label, false_label);
-        strcat(result, temp);
+        ensure_label(true_label);
+        ensure_label(false_label);
+        sprintf(result + strlen(result), "  br i1 %d, label %%%d, label %%%d\n", 
+                cond_res.value != 0, *true_label, *false_label);
     } else {
-        sprintf(temp, "  %%%d = icmp ne i32 %%%d, 0\n", cond_bool_reg, cond_res.value);
-        strcat(result, temp);
+        sprintf(result + strlen(result), "  %%%d = icmp ne i32 %%%d, 0\n", cond_bool_reg, cond_res.value);
         
-        sprintf(temp, "  br i1 %%%d, label %%%d, label %%%d\n", 
-                cond_bool_reg, true_label, false_label);
-        strcat(result, temp);
+        ensure_label(true_label);
+        ensure_label(false_label);
+        sprintf(result + strlen(result), "  br i1 %%%d, label %%%d, label %%%d\n", 
+                cond_bool_reg, *true_label, *false_label);
     }
     
     return cond_bool_reg;
@@ -631,21 +629,19 @@ void genIfStmt(past node, char* result) {
     if (node == NULL || node->nodeType != IF_STMT) {
         return;
     }
-    
-    char temp[1024];
-    
-    int then_label = newLabel();
-    int else_label = newLabel();
-    int end_label = newLabel();
+    int then_label = 0;
+    int else_label = 0;
+    int end_label = 0;
     
     if (node->right != NULL) {  
-        genCondExpr(node->if_cond, result, then_label, else_label);
+        genCondExpr(node->if_cond, result, &then_label, &else_label);
     } else {  
-        genCondExpr(node->if_cond, result, then_label, end_label);
+        genCondExpr(node->if_cond, result, &then_label, &end_label);
     }
     
-    sprintf(temp, "%d:\n", then_label);
-    strcat(result, temp);
+    if (then_label != 0) {
+        sprintf(result + strlen(result), "%d:\n", then_label);
+    }
     
     // 处理 then 分支
     if (node->left != NULL) {
@@ -656,24 +652,22 @@ void genIfStmt(past node, char* result) {
                 genStmt(node->left->right, result);
             } else {
                 // BlockItems 链表
-                past stmt = node->left->right;
-                while (stmt != NULL) {
-                    genStmt(stmt->left, result);
-                    stmt = stmt->right;
-                }
+                past stmt = node->left; // 直接传入 node->left，genStmt 会正确处理
+                genStmt(stmt, result);
             }
         } else {
             genStmt(node->left, result);
         }
     }
     
-    sprintf(temp, "  br label %%%d\n", end_label);
-    strcat(result, temp);
+    ensure_label(&end_label);
+    sprintf(result + strlen(result), "  br label %%%d\n", end_label);
     
     // 处理 else 分支
     if (node->right != NULL) {
-        sprintf(temp, "%d:\n", else_label);
-        strcat(result, temp);
+        if (else_label != 0) {
+            sprintf(result + strlen(result), "%d:\n", else_label);
+        }
         
         if (node->right->nodeType == COMPOUND_STMT) {
             // 检查是包装的单个语句还是 BlockItems 链表
@@ -682,11 +676,7 @@ void genIfStmt(past node, char* result) {
                 genStmt(node->right->right, result);
             } else {
                 // BlockItems 链表
-                past stmt = node->right->right;
-                while (stmt != NULL) {
-                    genStmt(stmt->left, result);
-                    stmt = stmt->right;
-                }
+                genStmt(node->right, result);
             }
         } else if (node->right->nodeType == IF_STMT) {
             // else if 情况
@@ -695,12 +685,10 @@ void genIfStmt(past node, char* result) {
             genStmt(node->right, result);
         }
         
-        sprintf(temp, "  br label %%%d\n", end_label);
-        strcat(result, temp);
+        sprintf(result + strlen(result), "  br label %%%d\n", end_label);
     }
 
-    sprintf(temp, "%d:\n", end_label);
-    strcat(result, temp);
+    sprintf(result + strlen(result), "%d:\n", end_label);
 }
 
 
@@ -708,23 +696,19 @@ void genWhileStmt(past node, char* result) {
     if (node == NULL || node->nodeType != WHILE_STMT) {
         return;
     }
-    
-    char temp[1024];
-
     int cond_label = newLabel();
-    int body_label = newLabel();
-    int end_label = newLabel();
+    int body_label = 0;
+    int end_label = 0;
 
-    sprintf(temp, "  br label %%%d\n", cond_label);
-    strcat(result, temp);
+    sprintf(result + strlen(result), "  br label %%%d\n", cond_label);
 
-    sprintf(temp, "%d:\n", cond_label);
-    strcat(result, temp);
+    sprintf(result + strlen(result), "%d:\n", cond_label);
 
-    genCondExpr(node->left, result, body_label, end_label);
+    genCondExpr(node->left, result, &body_label, &end_label);
 
-    sprintf(temp, "%d:\n", body_label);
-    strcat(result, temp);
+    if (body_label != 0) {
+        sprintf(result + strlen(result), "%d:\n", body_label);
+    }
 
     // 处理循环体
     if (node->right != NULL) {
@@ -735,22 +719,17 @@ void genWhileStmt(past node, char* result) {
                 genStmt(node->right->right, result);
             } else {
                 // BlockItems 链表
-                past stmt = node->right->right;
-                while (stmt != NULL) {
-                    genStmt(stmt->left, result);
-                    stmt = stmt->right;
-                }
+                genStmt(node->right, result);
             }
         } else {
             genStmt(node->right, result);
         }
     }
 
-    sprintf(temp, "  br label %%%d\n", cond_label);
-    strcat(result, temp);
+    sprintf(result + strlen(result), "  br label %%%d\n", cond_label);
 
-    sprintf(temp, "%d:\n", end_label);
-    strcat(result, temp);
+    ensure_label(&end_label);
+    sprintf(result + strlen(result), "%d:\n", end_label);
 }
 
 
@@ -758,9 +737,6 @@ void genStmt(past node, char* result) {
     if (node == NULL) {
         return;
     }
-    
-    char temp[1024];
-    
     switch (node->nodeType) {
         case BINARY_OPERATOR:
             if (node->ivalue == Y_ASSIGN) {
@@ -802,21 +778,22 @@ void genStmt(past node, char* result) {
                 if (node->left != NULL) {
                     ExprResult ret_res = genExpr(node->left, result);
                     if (ret_res.is_immediate) {
-                        sprintf(temp, "  ret i32 %d\n", ret_res.value);
+                        sprintf(result + strlen(result), "  ret i32 %d\n", ret_res.value);
                     } else {
-                        sprintf(temp, "  ret i32 %%%d\n", ret_res.value);
+                        sprintf(result + strlen(result), "  ret i32 %%%d\n", ret_res.value);
                     }
                 } else {
-                    sprintf(temp, "  ret i32 0\n");
+                    sprintf(result + strlen(result), "  ret i32 0\n");
                 }
-                strcat(result, temp);
             }
             break;
         case COMPOUND_STMT:
             {
-                past stmt = node->right;
+                past stmt = node;
                 while (stmt != NULL) {
-                    genStmt(stmt->left, result);
+                    if (stmt->left != NULL) {
+                        genStmt(stmt->left, result);
+                    }
                     stmt = stmt->right;
                 }
             }

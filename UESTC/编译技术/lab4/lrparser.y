@@ -1,7 +1,7 @@
 %{
 
 #include <stdio.h>
-#include "../lab3/ast.h"
+#include "ast.h"
 int yylex(void);
 void yyerror(char *);
 extern int type;
